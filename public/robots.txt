@@ -1,0 +1,5 @@
+# robots.txt for sellor.ai
+User-agent: *
+Allow: /
+
+Sitemap: https://sellor.ai/sitemap.xml

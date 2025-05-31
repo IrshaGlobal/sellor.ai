@@ -1,0 +1,49 @@
+{
+  "name": "sellor-ai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "prisma:generate": "prisma generate",
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "prisma:migrate": "prisma migrate dev --name init"
+  },
+  "dependencies": {
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.0.0",
+    "lucide-react": "^0.294.0",
+    "next-auth": "^4.24.5",
+    "react-hook-form": "^7.46.2",
+    "resend": "^0.9.0",
+    "zod": "^3.22.2",
+    "@prisma/client": "^5.18.0",
+    "@stripe/stripe-js": "^2.3.0",
+    "autoprefixer": "^10.4.17",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.3.5",
+    "typescript": "^5.3.3",
+    "tsx": "^4.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.2",
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.21",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "latest",
+    "prisma": "^5.18.0",
+    "ts-node": "^10.9.1",
+    "typesafe-i18n": "^1.4.0",
+    "prettier": "^3.2.4",
+    "prettier-plugin-tailwindcss": "^0.5.9",
+    "tailwind-merge": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}

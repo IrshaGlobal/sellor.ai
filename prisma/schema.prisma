@@ -1,0 +1,123 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  name          String?
+  storeName     String?
+  subdomain     String?   @unique
+  role          Role      @default(VENDOR)
+  store         Store?    @relation(fields: [storeId], references: [id])
+  storeId       String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Store {
+  id              String        @id @default(uuid())
+  name            String
+  subdomain       String        @unique
+  customDomain    String?
+  users           User[]
+  products        Product[]
+  orders          Order[]
+  settings        StoreSettings?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model StoreSettings {
+  id              String    @id @default(uuid())
+  storeId         String    @unique
+  store           Store     @relation(fields: [storeId], references: [id])
+  logoUrl         String?
+  accentColor     String    @default("#000000")
+  description     String?
+  contactEmail    String?
+  shippingRate    Float     @default(5.0)
+  freeShippingMin Float?
+  refundPolicy    String
+  privacyPolicy   String
+  termsOfService  String
+  stripeAccountId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Product {
+  id            String    @id @default(uuid())
+  storeId       String
+  store         Store     @relation(fields: [storeId], references: [id])
+  title         String
+  description   String
+  price         Float
+  sku           String?
+  inventory     Int       @default(1)
+  imageUrl      String
+  tags          String[]
+  category      Category
+  status        Status    @default(DRAFT)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Order {
+  id              String    @id @default(uuid())
+  storeId         String
+  store           Store     @relation(fields: [storeId], references: [id])
+  customerId      String
+  customerEmail   String
+  shippingAddress Json
+  items           Json
+  subtotal        Float
+  shipping        Float
+  total           Float
+  paymentStatus   PaymentStatus
+  orderStatus     OrderStatus @default(PENDING)
+  trackingNumber  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+enum Role {
+  PLATFORM_ADMIN
+  VENDOR
+}
+
+enum Status {
+  DRAFT
+  PUBLISHED
+}
+
+enum Category {
+  APPAREL
+  ACCESSORIES
+  HOME_AND_DECOR
+  ELECTRONICS
+  BEAUTY_AND_HEALTH
+  TOYS_AND_GAMES
+  BOOKS
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
