@@ -5,22 +5,68 @@ export default function VendorDashboard() {
   const [storeUrl, setStoreUrl] = useState('');
   const [stats, setStats] = useState({
     totalSales: 0,
-    totalOrders: 0
+    totalOrders: 0,
   });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // In a real app, this would fetch from an API endpoint
-    // For demo purposes, we'll use mock data
-    setTimeout(() => {
-      setStats({
-        totalSales: 2475.50,
-        totalOrders: 83
+    setIsLoading(true);
+    setError(null);
+    fetch('/api/vendor/dashboard-stats')
+      .then(async response => {
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch dashboard data and parse error response' }));
+          throw new Error(errorData.error || `Error: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        setStats({ totalSales: data.totalSales || 0, totalOrders: data.totalOrders || 0 });
+        setStoreUrl(data.storeUrl || '');
+      })
+      .catch(err => {
+        console.error("Error fetching vendor dashboard stats:", err);
+        setError(err.message);
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
-      
-      // Get store subdomain from user data (mocked here)
-      setStoreUrl('mystore.sellor.ai');
-    }, 500);
   }, []);
+
+  if (isLoading) {
+    return (
+      <div>
+        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-lg shadow-md animate-pulse">
+            <h2 className="text-xl font-semibold mb-2 bg-gray-200 h-6 rounded w-3/4"></h2>
+            <p className="text-3xl font-bold bg-gray-200 h-8 rounded w-1/2"></p>
+          </div>
+          <div className="bg-white p-6 rounded-lg shadow-md animate-pulse">
+            <h2 className="text-xl font-semibold mb-2 bg-gray-200 h-6 rounded w-3/4"></h2>
+            <p className="text-3xl font-bold bg-gray-200 h-8 rounded w-1/2"></p>
+          </div>
+        </div>
+        <p className="text-center text-gray-500">Loading dashboard data...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded" role="alert">
+          <p className="font-bold">Error</p>
+          <p>{error}</p>
+        </div>
+        <p className="text-center text-gray-500">
+          Could not load dashboard data. Please try again later or contact support if the issue persists.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -46,7 +92,14 @@ export default function VendorDashboard() {
           <Link href="/vendor/products" className="bg-gray-200 text-gray-800 py-3 px-4 rounded-md hover:bg-gray-300 transition-colors text-center">
             Manage Products
           </Link>
-          <Link href={`/store/${storeUrl}`} target="_blank" className="bg-blue-500 text-white py-3 px-4 rounded-md hover:bg-blue-600 transition-colors text-center">
+          <Link
+            href={storeUrl ? `https://${storeUrl}` : '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`bg-blue-500 text-white py-3 px-4 rounded-md hover:bg-blue-600 transition-colors text-center ${!storeUrl && 'opacity-50 cursor-not-allowed'}`}
+            aria-disabled={!storeUrl}
+            onClick={(e) => { if (!storeUrl) e.preventDefault(); }}
+          >
             View Your Store
           </Link>
         </div>

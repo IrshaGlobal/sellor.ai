@@ -1,108 +1,132 @@
-import { Configuration, OpenAIApi } from 'openai';
+import { Configuration, OpenAIApi, ChatCompletionRequestMessage } from 'openai';
 
 // Initialize OpenAI configuration
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// It's better to initialize this once and reuse, or inside the function if API key can change/be absent
+let openai: OpenAIApi | null = null;
+if (process.env.OPENAI_API_KEY) {
+  const configuration = new Configuration({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+  openai = new OpenAIApi(configuration);
+} else {
+  console.warn("OpenAI API key is missing. AI features will be disabled.");
+}
 
-const openai = new OpenAIApi(configuration);
+const defaultCategories = [
+  'Apparel', 'Accessories', 'Home & Decor', 'Electronics',
+  'Beauty & Health', 'Toys & Games', 'Books', 'Other'
+];
 
 /**
- * Generates product details using OpenAI Vision API based on an image
+ * Generates product details using OpenAI Vision API based on an image, expecting JSON output.
  * @param imageUrl - URL of the image to analyze
- * @returns Promise with generated product details or error message
+ * @returns Promise with structured product data or an error object
  */
 export async function generateProductFromImage(imageUrl: string) {
-  try {
-    // Get predefined categories from environment variable or use default
-    const predefinedCategories = process.env.AI_PRODUCT_CATEGORIES?.split(',') || [
-      'Apparel',
-      'Accessories',
-      'Home & Decor',
-      'Electronics',
-      'Beauty & Health',
-      'Toys & Games',
-      'Books',
-      'Other'
-    ];
+  if (!openai) {
+    console.error("OpenAI client is not initialized due to missing API key.");
+    return {
+      error: true,
+      message: "AI service is not configured. API key is missing.",
+      title: "Manual Entry Required",
+      description: "AI service unavailable. Please fill details manually.",
+      tags: [],
+      category: "Other"
+    };
+  }
 
-    // Construct the prompt for OpenAI
-    const prompt = `${process.env.AI_PRODUCT_PROMPT || "You are an e-commerce product specialist. Based on this image, generate a compelling product title (max 60 chars), a descriptive product description (approx 50 words), 3-5 relevant SEO keywords/tags, and suggest the most appropriate category from this list"} [${predefinedCategories.join(', ')}].`;
+  const categoriesString = process.env.AI_PRODUCT_CATEGORIES || defaultCategories.join(',');
+  const categories = categoriesString.split(',').map(c => c.trim());
 
-    // Call OpenAI Vision API
-    const response = await openai.createChatCompletion({
-      model: process.env.OPENAI_MODEL || 'gpt-4-vision-preview',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: imageUrl } },
-          ],
-        },
+  const promptInstruction = process.env.AI_PRODUCT_PROMPT_JSON_MODE ||
+    `You are an e-commerce product specialist. Based on the provided image, analyze it and return a single, valid JSON object. This JSON object must strictly contain the following keys: "title" (string, concise and descriptive, max 60 characters), "description" (string, engaging and informative, ideally around 50 words), "tags" (array of 3-5 relevant string SEO keywords/tags, e.g., ["tag1", "tag2"]), and "category" (string, must be one of the following values: ${categories.join(', ')}). Do not include any text or explanation outside of this JSON object.`;
+
+  const messages: Array<ChatCompletionRequestMessage> = [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: promptInstruction },
+        { type: 'image_url', image_url: { url: imageUrl } },
       ],
-      max_tokens: 300,
+    },
+  ];
+
+  try {
+    const response = await openai.createChatCompletion({
+      model: process.env.OPENAI_MODEL || "gpt-4-vision-preview",
+      messages: messages,
+      max_tokens: 350, // Increased slightly for potentially longer JSON structure
+      // temperature: 0.3, // Optional: Adjust for more deterministic output if needed
     });
 
-    // Extract the generated content from the response
-    const content = response.data.choices[0]?.message?.content;
-
-    if (!content) {
-      throw new Error('No response from AI');
+    const aiResponseContent = response.data.choices[0]?.message?.content;
+    if (!aiResponseContent) {
+      throw new Error("No content in AI response");
     }
 
-    // Parse the AI response into structured product data
-    // This is a simplified example - in production, you'd want more robust parsing
-    const lines = content.split('\n').map((line: string) => line.trim());
+    // Attempt to extract JSON even if there's other text (though prompt asks not to)
+    let jsonString = aiResponseContent;
+    const jsonMatch = aiResponseContent.match(/```json\n([\s\S]*?)\n```/);
+    if (jsonMatch && jsonMatch[1]) {
+      jsonString = jsonMatch[1];
+    } else {
+       // Fallback: try to find first '{' and last '}'
+       const firstBrace = jsonString.indexOf('{');
+       const lastBrace = jsonString.lastIndexOf('}');
+       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+         jsonString = jsonString.substring(firstBrace, lastBrace + 1);
+       }
+    }
     
-    const productData = {
-      title: '',
-      description: '',
-      tags: [] as string[],
-      category: '',
-      rawResponse: content
+    let parsedData;
+    try {
+      parsedData = JSON.parse(jsonString);
+    } catch (parseError) {
+      console.error("Failed to parse AI JSON response:", parseError, "Original content:", aiResponseContent);
+      throw new Error("AI returned invalid JSON format.");
+    }
+
+    // Validate and normalize parsedData
+    const { title, description } = parsedData;
+    let { tags, category } = parsedData;
+
+    if (!title || typeof title !== 'string' ||
+        !description || typeof description !== 'string') {
+      throw new Error("AI response missing required fields: title or description.");
+    }
+
+    // Validate and normalize tags
+    if (typeof tags === 'string') {
+      tags = tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+    } else if (!Array.isArray(tags) || !tags.every((t: any) => typeof t === 'string')) {
+      console.warn("AI returned tags in an unexpected format. Defaulting to empty array. Tags:", tags);
+      tags = [];
+    }
+    tags = tags.slice(0, 5); // Ensure max 5 tags
+
+    // Validate category
+    if (!category || typeof category !== 'string' || !categories.includes(category)) {
+      console.warn(`AI returned category "${category}" not in predefined list. Defaulting to "Other".`);
+      category = "Other";
+    }
+
+    return {
+      success: true,
+      title: title.substring(0, 100), // Ensure title doesn't exceed a reasonable length
+      description,
+      tags,
+      category
     };
 
-    // Simple parsing logic - would need refinement for production
-    for (const line of lines) {
-      if (line.startsWith('**Product Title:**')) {
-        productData.title = line.replace('**Product Title:**', '').trim();
-      } else if (line.startsWith('**Product Description:**')) {
-        productData.description = line.replace('**Product Description:**', '').trim();
-      } else if (line.startsWith('**Tags:**')) {
-        productData.tags = line
-          .replace('**Tags:**', '')
-          .trim()
-          .split(',')
-          .map((tag: string) => tag.trim())
-          .filter((tag: string) => tag);
-      } else if (line.startsWith('**Category:**')) {
-        const category = line.replace('**Category:**', '').trim();
-        if (predefinedCategories.includes(category)) {
-          productData.category = category;
-        } else {
-          // If AI suggests a category not in our list, default to 'Other'
-          productData.category = 'Other';
-        }
-      }
-    }
-
-    // Basic validation
-    if (!productData.title || !productData.description) {
-      throw new Error('AI did not return required product title and description');
-    }
-
-    return productData;
-  } catch (error) {
-    console.error('Error generating product from image:', error);
-    
-    // Return a standard error response
+  } catch (error: any) {
+    console.error("Error in generateProductFromImage:", error.response ? error.response.data : error.message);
     return {
-      title: 'Manual Entry Required',
-      description: 'The AI couldn\'t process the image, please fill details manually.',
+      error: true,
+      message: error.message || "Unknown error occurred during AI generation.",
+      title: "Manual Entry Required",
+      description: "The AI couldn't process the image or returned an unexpected format. Please fill details manually.",
       tags: [],
-      category: 'Other',
-      rawResponse: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      category: "Other"
     };
   }
 }

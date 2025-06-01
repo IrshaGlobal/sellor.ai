@@ -35,6 +35,8 @@ export const ProductForm = ({ initialData, categories, isEditing = false }: Prod
   const [tags, setTags] = useState(initialData?.tags || '');
   const [categoryId, setCategoryId] = useState(initialData?.categoryId || '');
   const [aiResult, setAiResult] = useState<AIProductResult | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   
   const {
     isLoading: isAIGenerating,
@@ -73,29 +75,54 @@ export const ProductForm = ({ initialData, categories, isEditing = false }: Prod
       }
     },
     onError: (error) => {
-      console.error('AI generation error:', error);
+      // This error is from AIProductGenerator, distinct from imageUploadError
+      console.error('AI generation error from hook:', error);
     }
   });
   
-  const handleImageUpload = (file: File) => {
-    // In a real app, this would upload to storage and return a URL
-    // For demo purposes, we'll just show a preview
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        setImageUrl(e.target.result.toString());
-        // Generate AI details when image is uploaded
-        generateProductDetails(e.target!.result.toString());
+  const handleImageUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    setIsUploadingImage(true);
+    setImageUploadError(null);
+    setAiResult(null); // Clear previous AI results if a new image is uploaded
+
+    try {
+      const response = await fetch('/api/upload-image', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          // 'Content-Type': 'multipart/form-data' is automatically set by browser with FormData
+          'Accept': 'application/json',
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Image upload failed');
       }
-    };
-    
-    reader.readAsDataURL(file);
+
+      setImageUrl(data.imageUrl); // Update preview with URL from server
+      if (data.imageUrl) {
+        // Now call AI generator with the new public URL
+        generateProductDetails(data.imageUrl);
+      }
+    } catch (err: any) {
+      console.error('Image upload error:', err);
+      setImageUploadError(err.message || 'An unexpected error occurred during upload.');
+      // Optionally clear imageUrl if upload failed and it was set optimistically before
+      // setImageUrl(''); // Or keep potentially broken/old URL for user to see?
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
   
   const handleRemoveImage = () => {
     setImageUrl('');
     setAiResult(null);
+    setImageUploadError(null); // Clear any upload errors too
   };
   
   const handleSubmit = (e: React.FormEvent) => {
@@ -124,26 +151,51 @@ export const ProductForm = ({ initialData, categories, isEditing = false }: Prod
               <ImageUpload 
                 onUpload={handleImageUpload} 
                 currentImage={imageUrl} 
-                onRemove={handleRemoveImage} 
+                onRemove={handleRemoveImage}
+                disabled={isUploadingImage || isAIGenerating}
               />
-              
-              {isAIGenerating && imageUrl && (
+
+              {isUploadingImage && (
                 <div className="mt-4 flex items-center justify-center p-4 bg-gray-50 rounded-lg">
-                  <Loader2 className="animate-spin h-6 w-6 text-gray-500 mr-2" />
+                  <svg className="animate-spin h-6 w-6 text-gray-500 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="text-gray-600">Uploading image...</span>
+                </div>
+              )}
+
+              {imageUploadError && !isUploadingImage && (
+                 <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-lg flex items-start">
+                  <svg className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <p className="text-sm">{imageUploadError}</p>
+                </div>
+              )}
+              
+              {isAIGenerating && imageUrl && !imageUploadError && (
+                <div className="mt-4 flex items-center justify-center p-4 bg-gray-50 rounded-lg">
+                   <svg className="animate-spin h-6 w-6 text-gray-500 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
                   <span className="text-gray-600">AI is analyzing your product...</span>
                 </div>
               )}
               
-              {aiError && !isAIGenerating && (
+              {aiError && !isAIGenerating && !imageUploadError && (
                 <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-lg flex items-start">
-                  <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+                   <svg className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
                   <p className="text-sm">
-                    {aiError}. Please fill out the details manually.
+                    AI Error: {aiError}. Please fill out the details manually or try a different image.
                   </p>
                 </div>
               )}
               
-              {aiResult && !isAIGenerating && (
+              {aiResult && !isAIGenerating && !imageUploadError && (
                 <div className="mt-4 space-y-4">
                   <div>
                     <h3 className="font-medium text-gray-900">AI Suggested Tags:</h3>
@@ -300,9 +352,9 @@ export const ProductForm = ({ initialData, categories, isEditing = false }: Prod
               <div className="flex space-x-4">
                 <button
                   type="submit"
-                  disabled={!imageUrl || !title || !description || !price}
+                  disabled={isUploadingImage || isAIGenerating || !imageUrl || !title || !description || !price}
                   className={`flex-1 bg-black text-white py-2 px-4 rounded-md hover:bg-black/90 transition-colors
-                    ${(!imageUrl || !title || !description || !price) ? 'opacity-50 cursor-not-allowed' : ''}
+                    ${(isUploadingImage || isAIGenerating || !imageUrl || !title || !description || !price) ? 'opacity-50 cursor-not-allowed' : ''}
                   `}
                 >
                   {isEditing ? 'Update Product' : 'Publish Product'}
@@ -310,6 +362,7 @@ export const ProductForm = ({ initialData, categories, isEditing = false }: Prod
                 <button
                   type="button"
                   className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 transition-colors"
+                  disabled={isUploadingImage || isAIGenerating}
                 >
                   Save as Draft
                 </button>

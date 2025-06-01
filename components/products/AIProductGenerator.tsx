@@ -17,28 +17,33 @@ export const AIProductGenerator = ({ onGenerate, onError }: AIProductGeneratorPr
     setError(null);
     
     try {
-      // In a real app, this would call our AI service
-      // For demo, we'll simulate an API call with a timeout
-      console.log('Calling AI to analyze image:', imageUrl);
+      console.log('Calling /api/ai/generate for image URL:', imageUrl);
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageUrl }),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        // Use error message from API response if available, otherwise a default
+        throw new Error(responseData.error || `AI generation failed with status: ${response.status}`);
+      }
       
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Simulated successful response
-      const result = {
-        title: 'Wireless Noise-Canceling Headphones',
-        description: 'High-quality wireless headphones with advanced noise cancellation technology. Offers crystal clear audio quality and 20-hour battery life.',
-        tags: ['headphones', 'wireless', 'noise-canceling', 'audio'],
-        category: 'Electronics'
-      };
-      
-      setIsLoading(false);
-      onGenerate(result);
+      // The API is expected to return { title, description, tags, category }
+      // The 'tags' from the API should now be an array of strings.
+      onGenerate(responseData);
+
     } catch (err) {
-      setIsLoading(false);
-      const errorMessage = err instanceof Error ? err.message : 'AI couldn\'t process the image';
+      const errorMessage = err instanceof Error ? err.message : 'AI couldn\'t process the image or an unknown error occurred.';
+      console.error('Error in AIProductGenerator:', errorMessage, err);
       setError(errorMessage);
-      onError(errorMessage);
+      onError(errorMessage); // Propagate error to the component using this hook
+    } finally {
+      setIsLoading(false);
     }
   };
 
