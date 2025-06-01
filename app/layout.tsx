@@ -30,8 +30,8 @@ export default function RootLayout({ children }: RootLayoutProps) {
               {children}
             </main>
             
-            {/* Footer - shown on all pages except admin/vendor dashboards */}
-            {!window.location.pathname.startsWith('/vendor') && 
+            {/* TODO: The global footer below was commented out because its conditional display logic (using window.location.pathname) is not Next.js SSR/SSG friendly and conflicts with the specific landing page footer. This can be revisited to implement a global footer with Next.js idiomatic conditional rendering (e.g., using usePathname or different layouts) if needed for other general site pages. */}
+            {/* {!window.location.pathname.startsWith('/vendor') &&
              !window.location.pathname.startsWith('/admin') && (
               <footer className="bg-gray-900 text-white mt-12">
                 <div className="container mx-auto px-4 py-8">
@@ -63,7 +63,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
                   </div>
                 </div>
               </footer>
-            )}
+            )} */}
           </div>
         </NextAuthProvider>
       </body>

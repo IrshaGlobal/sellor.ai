@@ -1,4 +1,12 @@
 import { useState, useEffect } from 'react';
+import Link from 'next/link'; // Added Link import
+
+// Helper to format date/time for recent activity
+const formatTimestamp = (isoString: string) => {
+  const date = new Date(isoString);
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ', ' + date.toLocaleDateString();
+};
+
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -7,23 +15,53 @@ export default function AdminDashboard() {
     newSignupsToday: 0,
     aiProductCreations: 0,
     totalStores: 0,
-    successfulOrders: 0
+    successfulOrders: 0,
+    recentActivity: [] as Array<{id: string, message: string, timestamp: string, type: string}>, // Ensure recentActivity is typed
+    platformOverview: {
+      vendorsWithProductsPercentage: 0,
+      storesWithCustomDomainsPercentage: 0,
+      vendorsUsingAiPercentage: 0,
+      activeSubscriptionsPercentage: 0,
+      vendorRetentionRatePercentage: 0,
+    }
   });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null); // Typed error state
 
   useEffect(() => {
-    // In a real app, this would fetch from an admin API endpoint
-    // For demo purposes, we'll use mock data
-    setTimeout(() => {
-      setStats({
-        totalVendors: 127,
-        activeVendors: 93,
-        newSignupsToday: 5,
-        aiProductCreations: 342,
-        totalStores: 127,
-        successfulOrders: 843
+    setIsLoading(true);
+    setError(null);
+    fetch('/api/admin/dashboard-stats')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to fetch dashboard stats. Status: ' + response.status);
+        }
+        return response.json();
+      })
+      .then(data => {
+        setStats(data);
+      })
+      .catch(err => {
+        console.error("Error fetching dashboard stats:", err);
+        setError(err.message);
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
-    }, 500);
   }, []);
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-screen"><p className="text-xl">Loading dashboard...</p></div>;
+  }
+
+  if (error) {
+    return <div className="flex justify-center items-center h-screen"><p className="text-xl text-red-500">Error loading dashboard: {error}</p></div>;
+  }
+
+  // Fallback if stats are not loaded for some reason, though covered by isLoading/error
+  if (!stats) {
+    return <div className="flex justify-center items-center h-screen"><p className="text-xl">No dashboard data available.</p></div>;
+  }
 
   return (
     <div>
@@ -123,15 +161,15 @@ export default function AdminDashboard() {
           </div>
         </div>
         
-        {/* Conversion Rate Card */}
+        {/* Conversion Rate Card - Assuming this is for vendor activation */}
         <div className="bg-white p-6 rounded-lg shadow-md">
           <div className="flex justify-between items-start">
             <div>
-              <h2 className="text-xl font-semibold mb-2">Conversion Rate</h2>
+              <h2 className="text-xl font-semibold mb-2">Vendor Activation</h2>
               <p className="text-3xl font-bold">{(stats.activeVendors / stats.totalVendors * 100).toFixed(1)}%</p>
             </div>
             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
-              <path d="M2 12h20M2 7h20M2 17h20"></path>
+               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
             </svg>
           </div>
           <div className="mt-4">
@@ -144,128 +182,106 @@ export default function AdminDashboard() {
         {/* Recent Activity */}
         <div className="bg-white p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
-          
-          <div className="space-y-4">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </div>
-              <div>
-                <p className="font-medium">My Awesome Store has published their first product</p>
-                <p className="text-sm text-gray-500">2 minutes ago</p>
-              </div>
+          {stats.recentActivity && stats.recentActivity.length > 0 ? (
+            <div className="space-y-4">
+              {stats.recentActivity.map((activity) => (
+                <div key={activity.id} className="flex items-center">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 ${
+                    activity.type === 'new_vendor' ? 'bg-green-100 text-green-600' :
+                    activity.type === 'stripe_connected' ? 'bg-blue-100 text-blue-600' :
+                    activity.type === 'ai_product' ? 'bg-purple-100 text-purple-600' :
+                    'bg-gray-100 text-gray-600' // Default
+                  }`}>
+                    {/* Simple icon based on type */}
+                    {activity.type === 'new_vendor' && <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>}
+                    {activity.type === 'stripe_connected' && <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M2 10h20"></path></svg>}
+                    {activity.type === 'ai_product' && <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>}
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">{activity.message}</p>
+                    <p className="text-xs text-gray-500">{formatTimestamp(activity.timestamp)}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-            
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="4" width="20" height="16" rx="2"></rect>
-                  <path d="M2 10h20"></path>
-                </svg>
-              </div>
-              <div>
-                <p className="font-medium">Fashion Outlet connected their Stripe account</p>
-                <p className="text-sm text-gray-500">15 minutes ago</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mr-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 14.66V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5.34"></path>
-                  <polygon points="16 3 21 8 16 13 16 3"></polygon>
-                  <polygon points="8 3 3 8 8 13 8 3"></polygon>
-                  <circle cx="12" cy="12" r="10"></circle>
-                </svg>
-              </div>
-              <div>
-                <p className="font-medium">Cool Products Co updated their store design</p>
-                <p className="text-sm text-gray-500">1 hour ago</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center mr-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
-                  <path d="M12 16v-4M12 8h.01"></path>
-                </svg>
-              </div>
-              <div>
-                <p className="font-medium">Vendor subscription payment failed: My Awesome Store</p>
-                <p className="text-sm text-gray-500">3 hours ago</p>
-              </div>
-            </div>
-          </div>
+          ) : (
+            <p className="text-sm text-gray-500">No recent activity to display.</p>
+          )}
         </div>
         
         {/* Platform Overview */}
         <div className="bg-white p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold mb-4">Platform Overview</h2>
           
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-sm font-medium">Vendors with products</span>
-                <span className="text-sm font-medium">78%</span>
+          {stats.platformOverview && Object.keys(stats.platformOverview).length > 0 ? (
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-sm font-medium">Vendors with products</span>
+                  <span className="text-sm font-medium">{stats.platformOverview.vendorsWithProductsPercentage}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div className="bg-blue-500 h-2.5 rounded-full" style={{ width: `${stats.platformOverview.vendorsWithProductsPercentage}%` }}></div>
+                </div>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div className="bg-blue-500 h-2.5 rounded-full" style={{ width: '78%' }}></div>
+
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-sm font-medium">Stores with custom domains</span>
+                  <span className="text-sm font-medium">{stats.platformOverview.storesWithCustomDomainsPercentage}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div className="bg-green-500 h-2.5 rounded-full" style={{ width: `${stats.platformOverview.storesWithCustomDomainsPercentage}%` }}></div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-sm font-medium">Vendors using AI features</span>
+                  <span className="text-sm font-medium">{stats.platformOverview.vendorsUsingAiPercentage}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div className="bg-purple-500 h-2.5 rounded-full" style={{ width: `${stats.platformOverview.vendorsUsingAiPercentage}%` }}></div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-sm font-medium">Active subscriptions</span>
+                  <span className="text-sm font-medium">{stats.platformOverview.activeSubscriptionsPercentage}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div className="bg-red-500 h-2.5 rounded-full" style={{ width: `${stats.platformOverview.activeSubscriptionsPercentage}%` }}></div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-sm font-medium">Vendor retention rate</span>
+                  <span className="text-sm font-medium">{stats.platformOverview.vendorRetentionRatePercentage}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div className="bg-indigo-500 h-2.5 rounded-full" style={{ width: `${stats.platformOverview.vendorRetentionRatePercentage}%` }}></div>
+                </div>
               </div>
             </div>
-            
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-sm font-medium">Stores with custom domains</span>
-                <span className="text-sm font-medium">32%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div className="bg-green-500 h-2.5 rounded-full" style={{ width: '32%' }}></div>
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-sm font-medium">Vendors using AI features</span>
-                <span className="text-sm font-medium">92%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div className="bg-purple-500 h-2.5 rounded-full" style={{ width: '92%' }}></div>
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-sm font-medium">Active subscriptions</span>
-                <span className="text-sm font-medium">73%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div className="bg-red-500 h-2.5 rounded-full" style={{ width: '73%' }}></div>
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-sm font-medium">Vendor retention rate</span>
-                <span className="text-sm font-medium">85%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div className="bg-indigo-500 h-2.5 rounded-full" style={{ width: '85%' }}></div>
-              </div>
-            </div>
-          </div>
+          ) : (
+             <p className="text-sm text-gray-500">No platform overview data available.</p>
+          )}
           
           <div className="mt-6">
             <h3 className="text-lg font-semibold mb-2">Quick Actions</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <button className="bg-black text-white py-2 px-4 rounded-md hover:bg-black/90 transition-colors">
-                View Vendors
-              </button>
-              <button className="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 transition-colors">
-                View Analytics
-              </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Link href="/admin/vendors" legacyBehavior>
+                <a className="block w-full bg-black text-white text-center py-2 px-4 rounded-md hover:bg-black/90 transition-colors">
+                  View Vendors
+                </a>
+              </Link>
+              <Link href="/admin/analytics" legacyBehavior>
+                <a className="block w-full bg-gray-200 text-gray-800 text-center py-2 px-4 rounded-md hover:bg-gray-300 transition-colors">
+                  View Analytics
+                </a>
+              </Link>
             </div>
           </div>
         </div>

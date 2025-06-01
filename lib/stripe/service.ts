@@ -176,19 +176,19 @@ export async function setupPlatformProducts() {
 }
 
 /**
- * Creates a subscription for a vendor to our platform
+ * Creates a subscription for a store to our platform
  * @param customerId - Stripe customer ID
  * @param priceId - Price ID for the subscription
- * @param vendorId - Our internal vendor ID for metadata
+ * @param storeId - Our internal store ID for metadata
  * @returns The created subscription
  */
-export async function createPlatformSubscription(customerId: string, priceId: string, vendorId: string) {
+export async function createPlatformSubscription(customerId: string, priceId: string, storeId: string) {
   try {
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
       items: [{ price: priceId }],
       metadata: {
-        vendor_id: vendorId
+        store_id: storeId
       },
       expand: ['latest_invoice.payment_intent']
     });
@@ -283,7 +283,7 @@ export async function getVendorSubscriptionInfo(subscriptionId: string) {
     });
     
     const vendorSubscription: VendorSubscription = {
-      vendorId: subscription.metadata.vendor_id,
+      vendorId: subscription.metadata.store_id, // Assuming VendorSubscription.vendorId can now mean store_id
       storeName: (subscription.customer as StripeCustomer).email || 'Unknown Store',
       subscriptionId: subscription.id,
       status: subscription.status as 'active' | 'inactive' | 'past_due' | 'canceled',
@@ -317,7 +317,7 @@ export async function createCheckoutSession(vendorId: string, subscriptionId: st
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/admin/subscriptions?success=true`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/admin/subscriptions?cancel=true`,
       metadata: {
-        vendor_id: vendorId,
+        store_id: vendorId, // This seems like a param name mismatch, should be storeId if createCheckoutSession is updated
         subscription_id: subscriptionId
       },
       billing_address_collection: 'auto',

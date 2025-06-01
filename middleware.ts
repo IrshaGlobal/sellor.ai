@@ -38,6 +38,14 @@ export function middleware(request: NextRequest) {
     }
     
     // For authenticated routes, continue normally
+    // Additional check for admin routes
+    if (isAuthenticated && url.pathname.startsWith('/admin')) {
+      const isAdmin = checkAdminRole(request);
+      if (!isAdmin) {
+        // Not an admin, redirect to homepage
+        return NextResponse.redirect(new URL('/', request.url));
+      }
+    }
     return NextResponse.next();
   }
   
@@ -55,6 +63,15 @@ function checkAuthentication(request: NextRequest): boolean {
   // For MVP, we'll use a simple cookie-based approach
   const authCookie = request.cookies.get('auth_token');
   return !!authCookie;
+}
+
+// Example (add this function within middleware.ts)
+function checkAdminRole(request: NextRequest): boolean {
+  // SIMULATION: In a real app, this would involve decoding a JWT from auth_token
+  // to check roles, or making an API call.
+  // For now, we'll simulate by checking for a specific cookie.
+  const isAdminCookie = request.cookies.get('admin_access_token'); // Or some other admin indicator
+  return isAdminCookie === 'true'; // Or whatever value signifies admin
 }
 
 /**

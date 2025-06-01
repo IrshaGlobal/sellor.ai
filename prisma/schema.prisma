@@ -30,6 +30,9 @@ model Store {
   products        Product[]
   orders          Order[]
   settings        StoreSettings?
+  platformSubscriptionId            String? // e.g., sub_xxxxxx
+  platformSubscriptionStatus        String? // e.g., "active", "trialing", "past_due", "canceled", "unpaid"
+  platformSubscriptionCurrentPeriodEnd DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 }
