@@ -6,25 +6,6 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-const TOAST_TYPES = {
-  BACKGROUND: {
-    info: 'bg-white',
-    success: 'bg-green-500',
-    error: 'bg-red-500',
-    warning: 'bg-yellow-500',
-    default: 'bg-white'
-  },
-  TEXT: {
-    info: 'text-black',
-    success: 'text-white',
-    error: 'text-white',
-    warning: 'text-black',
-    default: 'text-black'
-  }
-} as const;
-
-type ToastType = keyof typeof TOAST_TYPES.BACKGROUND;
-
 type ToastVariants = VariantProps<typeof toastVariants>;
 
 const toastVariants = cva(
@@ -51,7 +32,6 @@ interface ToastProps extends React.HTMLAttributes<HTMLDivElement>, ToastVariants
   title?: string;
   description?: string;
   action?: React.ReactNode;
-  type?: ToastType;
 }
 
 const Toast = React.forwardRef<HTMLDivElement, ToastProps>(
@@ -61,27 +41,12 @@ const Toast = React.forwardRef<HTMLDivElement, ToastProps>(
     title, 
     description, 
     action,
-    type = 'default',
     ...props 
   }, ref) => {
-    // Map our types to Radix's built-in variants
-    const radixVariant = React.useMemo(() => {
-      switch (type) {
-        case 'success':
-          return 'success';
-        case 'error':
-        case 'warning':
-          return 'destructive';
-        case 'info':
-        default:
-          return 'default';
-      }
-    }, [type]);
-    
     return (
       <ToastPrimitive.Root
         ref={ref}
-        className={cn(toastVariants({ variant: radixVariant, className }))}
+        className={cn(toastVariants({ variant, className }))}
         {...props}
       >
         <div className="grid gap-1">
