@@ -16,7 +16,6 @@ export default function App({ children }: AppProps) {
   // Handle any global initialization needed for the app
   useEffect(() => {
     // Initialize analytics, logging, etc.
-    console.log('sellor.ai app initialized');
     
     // In a real app, you would track page views here
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
