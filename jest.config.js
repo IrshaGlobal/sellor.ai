@@ -7,6 +7,7 @@ module.exports = {
     '^.+\.tsx?$': 'ts-jest'
   },
   moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/$1',
     '\.(css|less|scss|sass)$': 'identity-obj-proxy',
     '\.(gif|ttf|eot|svg|png)$': '<rootDir>/__mocks__/fileMock.js'
   },
@@ -21,5 +22,7 @@ module.exports = {
   testMatch: [
     '**/__tests__/**/*.test.[jt]s?(x)',
     '**/?(*.)+(spec|test).[tj]s?(x)'
-  ]
+  ],
+  roots: ['<rootDir>'],
+  modulePaths: ['<rootDir>']
 };

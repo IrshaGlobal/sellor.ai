@@ -1,9 +1,8 @@
-import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import { NextAuthOptions } from 'next-auth';
-import { Adapter } from 'next-auth/adapters';
+import { PrismaAdapter } from '@auth/prisma-adapter';
 import { db } from '@/lib/db';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 // Create a type-safe adapter for Prisma
 const prismaAdapter = (): Adapter => {
